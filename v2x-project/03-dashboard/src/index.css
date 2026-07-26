@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-feature-settings: 'tnum' 1;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #223041;
+  border-radius: 8px;
+}
+
+.mono-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes v2xPulse {
+  from { r: 4; opacity: 0.9; }
+  to { r: 26; opacity: 0; }
+}
+.v2x-pulse {
+  animation: v2xPulse 1.1s ease-out forwards;
+  transform-origin: center;
+}
+
+@keyframes v2xPathFade {
+  from { opacity: 0.85; }
+  to { opacity: 0; }
+}
+.v2x-path {
+  animation: v2xPathFade 1.4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2x-pulse, .v2x-path { animation: none; opacity: 0.3; }
+}

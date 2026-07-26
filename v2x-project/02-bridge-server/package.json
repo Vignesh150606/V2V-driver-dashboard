@@ -1,0 +1,17 @@
+{
+  "name": "v2x-bridge-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tails HazardApp's live event log and re-broadcasts it over WebSocket to the React dashboard. Also accepts the same JSON schema from hardware (ESP32) over HTTP.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  }
+}
