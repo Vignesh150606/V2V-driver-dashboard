@@ -1,14 +1,14 @@
 import { NavLink } from 'react-router-dom';
 
 const links = [
-  { to: '/', label: 'Dashboard', exact: true },
-  { to: '/live', label: 'Live simulation' },
-  { to: '/timeline', label: 'Packet timeline' },
-  { to: '/inspector', label: 'Vehicle inspector' },
-  { to: '/network', label: 'Network graph' },
-  { to: '/dataset', label: 'Dataset generator' },
-  { to: '/analytics', label: 'Analytics' },
-  { to: '/replay', label: 'Replay previous runs' },
+  { to: '/dashboard', label: 'Dashboard', exact: true },
+  { to: '/dashboard/live', label: 'Live simulation' },
+  { to: '/dashboard/timeline', label: 'Packet timeline' },
+  { to: '/dashboard/inspector', label: 'Vehicle inspector' },
+  { to: '/dashboard/network', label: 'Network graph' },
+  { to: '/dashboard/dataset', label: 'Dataset generator' },
+  { to: '/dashboard/analytics', label: 'Analytics' },
+  { to: '/dashboard/replay', label: 'Replay previous runs' },
 ];
 
 export default function Sidebar() {
@@ -25,7 +25,7 @@ export default function Sidebar() {
             to={l.to}
             end={l.exact}
             className={({ isActive }) =>
-              `block px-5 py-2.5 text-sm border-l-2 ${
+              `block px-5 py-2.5 text-sm border-l-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal/50 ${
                 isActive
                   ? 'border-teal text-ink bg-panel2'
                   : 'border-transparent text-ink2 hover:text-ink hover:bg-panel2/60'
@@ -36,6 +36,14 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="px-5 py-3 border-t border-line">
+        <NavLink to="/driver" className="block text-xs text-ink2 hover:text-teal outline-none focus-visible:ring-2 focus-visible:ring-teal/50 rounded mb-2">
+          → Open Driver View
+        </NavLink>
+        <NavLink to="/" className="block text-xs text-ink3 hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-teal/50 rounded">
+          ← Back to menu
+        </NavLink>
+      </div>
       <div className="px-5 py-4 border-t border-line text-xs text-ink3 leading-relaxed">
         Every position, packet, and decision on this console is emitted by
         HazardApp — nothing here is simulated in the browser.

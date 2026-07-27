@@ -22,7 +22,7 @@ export default function VehicleInspectorPage() {
             <button
               key={v.id}
               onClick={() => setSelectedId(v.id)}
-              className={`w-full text-left px-4 py-2.5 text-sm font-mono ${
+              className={`w-full text-left px-4 py-2.5 text-sm font-mono outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal/50 ${
                 selected?.id === v.id ? 'bg-panel2 text-ink' : 'text-ink2 hover:text-ink'
               }`}
             >

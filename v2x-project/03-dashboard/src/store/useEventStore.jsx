@@ -61,12 +61,26 @@ function reducer(state, action) {
         case 'packet_rx':
         case 'packet_relay': {
           const kind = event.type.replace('packet_', '');
+          // EventLogger only writes msg_type on the original tx event --
+          // rx/relay events carry sender/receiver/hop info but not the
+          // message kind itself. Look it up from the matching tx record
+          // (same packet_id) so anything reading msg_type off an rx/relay
+          // event (e.g. Driver View's alert feed) actually gets it instead
+          // of always seeing undefined.
+          let msgType = event.payload.msg_type;
+          if (!msgType && event.payload.packet_id) {
+            const txMatch = state.packets.find(
+              (p) => p.kind === 'tx' && p.packet_id === event.payload.packet_id
+            );
+            msgType = txMatch?.msg_type;
+          }
           const record = {
             key: `${event.type}-${event.payload.packet_id}-${kind}-${receivedAt}-${Math.random()}`,
             kind,
             timestamp_sim: event.timestamp_sim,
             receivedAt,
             ...event.payload,
+            msg_type: msgType,
           };
           return {
             ...state,

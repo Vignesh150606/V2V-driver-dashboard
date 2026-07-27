@@ -4,6 +4,7 @@ const KIND_STYLE = {
   tx: { label: 'TX', color: 'text-teal' },
   rx: { label: 'RX', color: 'text-blue' },
   relay: { label: 'RELAY', color: 'text-amber' },
+  unknown: { label: '?', color: 'text-ink3' },
 };
 
 export default function PacketTimelinePage() {
@@ -35,7 +36,7 @@ export default function PacketTimelinePage() {
               </tr>
             )}
             {packets.map((p) => {
-              const style = KIND_STYLE[p.kind];
+              const style = KIND_STYLE[p.kind] || KIND_STYLE.unknown;
               return (
                 <tr key={p.key} className="border-b border-line/60 last:border-0">
                   <td className="px-4 py-2 text-ink2">{p.timestamp_sim?.toFixed(2)}</td>

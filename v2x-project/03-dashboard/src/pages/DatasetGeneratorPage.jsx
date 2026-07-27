@@ -34,7 +34,7 @@ export default function DatasetGeneratorPage() {
         <button
           onClick={download}
           disabled={rowsChronological.length === 0}
-          className="text-xs font-mono px-3 py-1.5 rounded border border-line2 text-ink2 hover:text-ink hover:border-teal disabled:opacity-40 disabled:hover:border-line2"
+          className="text-xs font-mono px-3 py-1.5 rounded border border-line2 text-ink2 hover:text-ink hover:border-teal disabled:opacity-40 disabled:hover:border-line2 outline-none focus-visible:ring-2 focus-visible:ring-teal/50"
         >
           download csv
         </button>
