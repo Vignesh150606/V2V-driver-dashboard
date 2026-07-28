@@ -1,14 +1,61 @@
-// Thin wrapper around the WebSocket server: every event handed to
+// Thin wrapper around the WebSocket server. Every event handed to
 // hub.broadcast() -- whether it came from the simulation tailer or the
 // hardware ingest endpoint -- goes out to every connected dashboard
-// unchanged. The dashboard never has to know which source produced it.
+// unchanged, AND is recorded into a small snapshot/backlog so a client
+// that connects (or reconnects) mid-run isn't stuck looking at an empty
+// dashboard until the next event happens to arrive.
+const MAX_PACKETS_BACKLOG = 200;
+const MAX_DECISIONS_BACKLOG = 2000;
+
 export function createHub(wss) {
+  let currentRunId = null;
+  const vehicleSnapshot = new Map(); // vehicle_id -> latest vehicle_state event
+  const packetBacklog = [];
+  const decisionBacklog = [];
+
+  function resetSnapshot() {
+    vehicleSnapshot.clear();
+    packetBacklog.length = 0;
+    decisionBacklog.length = 0;
+  }
+
+  function record(event) {
+    if (event.run_id && event.run_id !== currentRunId) {
+      currentRunId = event.run_id;
+      resetSnapshot();
+    }
+    switch (event.type) {
+      case 'vehicle_state':
+        if (event.payload?.vehicle_id) vehicleSnapshot.set(event.payload.vehicle_id, event);
+        break;
+      case 'packet_tx':
+      case 'packet_rx':
+      case 'packet_relay':
+        packetBacklog.push(event);
+        if (packetBacklog.length > MAX_PACKETS_BACKLOG) packetBacklog.shift();
+        break;
+      case 'decision':
+        decisionBacklog.push(event);
+        if (decisionBacklog.length > MAX_DECISIONS_BACKLOG) decisionBacklog.shift();
+        break;
+      default:
+        break;
+    }
+  }
+
   wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'hello', payload: { message: 'connected to v2x bridge' } }));
+
+    // Replay what this client missed -- latest position per vehicle first
+    // (so the map is populated immediately), then the packet/decision
+    // history in the order it originally happened.
+    for (const event of vehicleSnapshot.values()) ws.send(JSON.stringify(event));
+    for (const event of [...packetBacklog, ...decisionBacklog]) ws.send(JSON.stringify(event));
   });
 
   return {
     broadcast(event) {
+      record(event);
       const msg = JSON.stringify(event);
       wss.clients.forEach((client) => {
         if (client.readyState === 1) client.send(msg);
