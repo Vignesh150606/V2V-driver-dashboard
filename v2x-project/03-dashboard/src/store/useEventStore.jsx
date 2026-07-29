@@ -8,6 +8,15 @@ const initialState = {
   connected: false,
   runId: null,
   scenario: null,
+  // Auto-detected from the backend's "scenarioChanged" message -- the
+  // Veins example folder name (e.g. "scenario4"), populated the instant
+  // the backend switches, even before the first event line arrives. This
+  // is deliberately kept separate from `scenario` above, which comes from
+  // the event content itself (e.g. "lane_merge") and is what CSV export /
+  // analytics already key off -- neither field changes meaning.
+  scenarioFolder: null,
+  activeRunFile: null,
+  eventsPerSec: 0,
   vehicles: {}, // id -> { id, x, y, speed, heading, road_id, lastSeen, lastDecision }
   packets: [], // most recent first: { id, kind, ...payload, timestamp_sim, receivedAt }
   decisions: [], // most recent first, full dataset-row equivalents
@@ -30,16 +39,43 @@ function reducer(state, action) {
       return {
         ...initialState,
         connected: state.connected,
+        scenarioFolder: state.scenarioFolder,
+        activeRunFile: state.activeRunFile,
         runId: action.runId,
         scenario: action.scenario,
       };
+
+    // The backend just started following a different run -- possibly a
+    // completely different scenario. Clear the live view immediately so
+    // stale vehicles/packets from the previous scenario don't linger;
+    // state.runId/scenario repopulate from the real event content within
+    // a fraction of a second, same as they always have.
+    case 'SCENARIO_CHANGED':
+      return {
+        ...initialState,
+        connected: state.connected,
+        eventsPerSec: state.eventsPerSec,
+        scenarioFolder: action.scenario,
+        activeRunFile: action.run,
+      };
+
+    case 'TICK':
+      return { ...state, eventsPerSec: action.eventsPerSec };
 
     case 'EVENT': {
       const event = action.event;
 
       // A new run started -- start the live view fresh.
       if (event.run_id && state.runId && event.run_id !== state.runId) {
-        state = { ...initialState, connected: state.connected, runId: event.run_id, scenario: event.scenario };
+        state = {
+          ...initialState,
+          connected: state.connected,
+          eventsPerSec: state.eventsPerSec,
+          scenarioFolder: state.scenarioFolder,
+          activeRunFile: state.activeRunFile,
+          runId: event.run_id,
+          scenario: event.scenario,
+        };
       } else if (!state.runId && event.run_id) {
         state = { ...state, runId: event.run_id, scenario: event.scenario };
       }
@@ -121,13 +157,34 @@ const EventStoreContext = createContext(null);
 export function EventStoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const connectionRef = useRef(null);
+  const eventsSinceTickRef = useRef(0);
 
   useEffect(() => {
     connectionRef.current = connectEventStream({
-      onEvent: (event) => dispatch({ type: 'EVENT', event }),
+      onEvent: (event) => {
+        // Control message from the bridge's scenario registry, not a
+        // HazardApp simulation event -- route it separately so it can
+        // never be mistaken for real event content (see the
+        // scenarioFolder/scenario distinction above).
+        if (event.type === 'scenarioChanged') {
+          dispatch({ type: 'SCENARIO_CHANGED', scenario: event.scenario, run: event.run });
+          return;
+        }
+        eventsSinceTickRef.current += 1;
+        dispatch({ type: 'EVENT', event });
+      },
       onStatusChange: (status) => dispatch({ type: 'STATUS', connected: status === 'connected' }),
     });
     return () => connectionRef.current?.close();
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const count = eventsSinceTickRef.current;
+      eventsSinceTickRef.current = 0;
+      dispatch({ type: 'TICK', eventsPerSec: count });
+    }, 1000);
+    return () => clearInterval(t);
   }, []);
 
   return <EventStoreContext.Provider value={state}>{children}</EventStoreContext.Provider>;

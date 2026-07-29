@@ -6,29 +6,30 @@ import { WebSocketServer } from 'ws';
 import fs from 'fs';
 import path from 'path';
 
-import { startTailing } from './lib/tailer.js';
 import { createHub } from './lib/hub.js';
 import { computeRunStats } from './lib/runStats.js';
+import { createScenarioRegistry, isSafeRunId } from './lib/scenarioRegistry.js';
 
 const PORT = process.env.PORT || 8080;
-const LOG_DIR = process.env.HAZARD_LOG_DIR || path.resolve('./results/live');
 
-if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+// The ONLY path you configure: the root "examples" folder of your Veins
+// checkout. The registry recursively discovers every
+// "<scenario>/results/live" folder under it and automatically follows
+// whichever one most recently started producing events -- you never
+// point this at one specific scenario, and never edit this file to
+// switch scenarios again.
+//
+// Example (Windows):
+// VEINS_EXAMPLES_ROOT=C:\Users\you\veins-5.3.1\veins-veins-5.3.1\examples
+const EXAMPLES_ROOT = process.env.VEINS_EXAMPLES_ROOT
+  ? path.resolve(process.env.VEINS_EXAMPLES_ROOT)
+  : null;
 
-// Any runId that reaches a filesystem path (from a URL param OR from
-// event.run_id in a hardware POST body) must be validated before use --
-// otherwise "../../../etc/passwd"-style values let a request read, export,
-// or delete arbitrary files outside LOG_DIR. Returns the safe absolute path,
-// or null if the runId is invalid.
-const SAFE_RUN_ID = /^[A-Za-z0-9._-]+$/;
-function resolveRunFile(runId) {
-  if (typeof runId !== 'string' || !SAFE_RUN_ID.test(runId)) return null;
-  const full = path.resolve(LOG_DIR, `${runId}.jsonl`);
-  // Defense in depth: even with the whitelist above this should be
-  // unreachable, but confirm the resolved path is still inside LOG_DIR.
-  if (!full.startsWith(path.resolve(LOG_DIR) + path.sep)) return null;
-  return full;
-}
+// Fixed, separate from the discovered scenario folders -- hardware/ESP32
+// events aren't produced by a Veins scenario, so they get their own
+// always-present "virtual scenario" instead of requiring a folder inside
+// VEINS_EXAMPLES_ROOT.
+const HARDWARE_DIR = path.resolve('./results/hardware-live');
 
 const app = express();
 app.use(cors());
@@ -38,14 +39,34 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 const hub = createHub(wss);
 
-function handleEvent(event) {
-  hub.broadcast(event);
+const registry = createScenarioRegistry({
+  examplesRoot: EXAMPLES_ROOT,
+  hardwareDir: HARDWARE_DIR,
+  onLiveEvent: (event) => hub.broadcast(event),
+  onActiveChange: (activeInfo) => {
+    console.log(`[scenario-registry] now following: ${activeInfo.scenario} / ${activeInfo.runFile}`);
+    hub.broadcast({
+      type: 'scenarioChanged',
+      scenario: activeInfo.scenario,
+      run: activeInfo.runFile,
+      run_id: activeInfo.runId,
+    });
+  },
+});
+
+function resolveHardwareFile(runId) {
+  if (!isSafeRunId(runId)) return null;
+  const dirAbs = path.resolve(HARDWARE_DIR);
+  const full = path.resolve(dirAbs, `${runId}.jsonl`);
+  if (!full.startsWith(dirAbs + path.sep)) return null; // defense in depth
+  return full;
 }
 
-// Source A: the simulation, via HazardApp's log file
-startTailing(LOG_DIR, handleEvent);
-
 // Source B: hardware (ESP32) or anything else, over HTTP -- same schema
+// HazardApp writes. Source A (the simulation) is handled entirely inside
+// scenarioRegistry/tailer -- this route only ever writes into
+// HARDWARE_DIR, one of the directories the registry already watches, so
+// hardware runs participate in auto-detection exactly like any scenario.
 app.post('/api/ingest', (req, res) => {
   const event = req.body;
   if (!event || !event.type || !event.payload) {
@@ -53,20 +74,25 @@ app.post('/api/ingest', (req, res) => {
   }
   event.source = event.source || 'hardware';
   event.timestamp_wall = Date.now();
+  // Stamp these onto the persisted event itself (not just used locally to
+  // pick a filename) -- the live-broadcast filter and computeRunStats
+  // both key off event.run_id / event.scenario, so a hardware client that
+  // omits them would otherwise silently never show up live.
+  event.scenario = event.scenario || 'hardware';
+  event.run_id = event.run_id || 'hardware_live';
 
-  // Persisting to LOG_DIR is the ONLY broadcast trigger -- the tailer
-  // watching this directory picks up the appended line and calls
-  // handleEvent() itself. Do not also call handleEvent() here: that
-  // delivers this same event to every connected client a second time as
-  // soon as the tailer's fs.watch fires (confirmed duplicate delivery of
-  // every hardware-ingested vehicle_state/packet/decision when this was
-  // tried before).
-  const runId = event.run_id || 'hardware_live';
-  const filePath = resolveRunFile(runId);
+  const filePath = resolveHardwareFile(event.run_id);
   if (!filePath) {
-    console.warn(`[ingest] rejected unsafe run_id in event body: ${JSON.stringify(runId)}`);
+    console.warn(`[ingest] rejected unsafe run_id in event body: ${JSON.stringify(event.run_id)}`);
     return res.status(400).json({ error: 'run_id must be alphanumeric (with _ . -), no path separators' });
   }
+
+  // Persisting to disk is the ONLY broadcast trigger -- the hardware
+  // directory's tailer picks up the appended line and calls onLiveEvent
+  // itself. Do not also broadcast here: that delivers this same event to
+  // every connected client a second time as soon as the tailer's
+  // fs.watch fires (this duplicated every hardware-ingested event before
+  // it was fixed -- see DEBUG_REPORT.md).
   fs.appendFile(filePath, JSON.stringify(event) + '\n', (err) => {
     if (err) console.warn('[ingest] failed to persist event to', filePath, err.message);
   });
@@ -74,28 +100,31 @@ app.post('/api/ingest', (req, res) => {
   res.json({ ok: true });
 });
 
-// Run history for the Replay page and the Driver View's dynamic vehicle/
-// scenario discovery. Every field here is computed fresh from the actual
-// recorded file on disk each time this is called -- the .jsonl files
-// written by EventLogger ARE the persistence layer; there is no separate
-// database to fall out of sync with them, and nothing here survives only
-// in memory (a server restart loses zero run history).
+// Run history for the Replay page and dataset export -- merged across
+// every watched scenario folder plus the hardware folder. Every field is
+// computed fresh from the actual recorded files on disk each time this
+// is called, same as before; there is still no separate database to fall
+// out of sync with them.
 app.get('/api/runs', (req, res) => {
-  const files = fs.readdirSync(LOG_DIR).filter((f) => f.endsWith('.jsonl'));
-  const runs = files.map((f) => {
+  const runs = registry.listAllRunFiles().map(({ filePath, scenario: scenarioDir }) => {
     try {
-      return computeRunStats(path.join(LOG_DIR, f));
+      return { ...computeRunStats(filePath), scenario_dir: scenarioDir };
     } catch {
-      return { run_id: f.replace('.jsonl', ''), scenario: 'unknown', event_count: 0 };
+      return {
+        run_id: path.basename(filePath).replace('.jsonl', ''),
+        scenario: 'unknown',
+        scenario_dir: scenarioDir,
+        event_count: 0,
+      };
     }
   });
   res.json(runs.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)));
 });
 
 app.get('/api/runs/:runId', (req, res) => {
-  const full = resolveRunFile(req.params.runId);
-  if (!full) return res.status(400).json({ error: 'invalid run id' });
-  if (!fs.existsSync(full)) return res.status(404).json({ error: 'run not found' });
+  if (!isSafeRunId(req.params.runId)) return res.status(400).json({ error: 'invalid run id' });
+  const full = registry.findRunFile(req.params.runId);
+  if (!full) return res.status(404).json({ error: 'run not found' });
   const events = fs
     .readFileSync(full, 'utf8')
     .trim()
@@ -107,40 +136,54 @@ app.get('/api/runs/:runId', (req, res) => {
 
 // Export: the exact raw file HazardApp wrote, as a download.
 app.get('/api/runs/:runId/export', (req, res) => {
-  const full = resolveRunFile(req.params.runId);
-  if (!full) return res.status(400).json({ error: 'invalid run id' });
-  if (!fs.existsSync(full)) return res.status(404).json({ error: 'run not found' });
+  if (!isSafeRunId(req.params.runId)) return res.status(400).json({ error: 'invalid run id' });
+  const full = registry.findRunFile(req.params.runId);
+  if (!full) return res.status(404).json({ error: 'run not found' });
   res.download(full, `${req.params.runId}.jsonl`);
 });
 
 // Delete a single run.
 app.delete('/api/runs/:runId', (req, res) => {
-  const full = resolveRunFile(req.params.runId);
-  if (!full) return res.status(400).json({ error: 'invalid run id' });
-  if (!fs.existsSync(full)) return res.status(404).json({ error: 'run not found' });
+  if (!isSafeRunId(req.params.runId)) return res.status(400).json({ error: 'invalid run id' });
+  const full = registry.findRunFile(req.params.runId);
+  if (!full) return res.status(404).json({ error: 'run not found' });
   fs.unlinkSync(full);
   res.json({ ok: true });
 });
 
-// Clear all run history.
+// Clear all run history across every watched folder.
 app.delete('/api/runs', (req, res) => {
-  const files = fs.readdirSync(LOG_DIR).filter((f) => f.endsWith('.jsonl'));
-  files.forEach((f) => fs.unlinkSync(path.join(LOG_DIR, f)));
+  const files = registry.listAllRunFiles();
+  files.forEach(({ filePath }) => {
+    try {
+      fs.unlinkSync(filePath);
+    } catch (e) {
+      console.warn('[api] failed to delete', filePath, e.message);
+    }
+  });
   res.json({ ok: true, deleted: files.length });
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, clients: hub.clientCount(), watching: LOG_DIR });
+  const active = registry.getActive();
+  res.json({
+    ok: true,
+    clients: hub.clientCount(),
+    examples_root: EXAMPLES_ROOT,
+    watching: registry.getWatchedDirs(),
+    active_scenario: active?.scenario ?? null,
+    active_run: active?.runFile ?? null,
+  });
 });
 
 server.listen(PORT, () => {
   console.log(`V2X bridge server listening on :${PORT}`);
   console.log(`WebSocket endpoint:  ws://localhost:${PORT}/ws`);
-  console.log(`Watching for HazardApp event logs in: ${LOG_DIR}`);
 });
 
 function shutdown() {
   console.log('\nShutting down -- closing WebSocket clients and HTTP server...');
+  registry.close();
   wss.clients.forEach((client) => client.close(1001, 'server shutting down'));
   wss.close(() => {
     server.close(() => process.exit(0));
