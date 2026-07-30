@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useEventStore } from '../store/useEventStore.jsx';
 import StatCard from '../components/StatCard.jsx';
 import VehicleMap from '../components/VehicleMap.jsx';
+import { decisionColorClass } from '../lib/decisionTiers.js';
 
 export default function DashboardPage() {
   const { vehicles, packets, decisions, runId, scenario, connected } = useEventStore();
@@ -14,6 +15,7 @@ export default function DashboardPage() {
 
   const vehicleCount = Object.keys(vehicles).length;
   const waitCount = decisions.filter((d) => d.decision?.startsWith('WAIT')).length;
+  const cautionCount = decisions.filter((d) => d.decision?.startsWith('CAUTION')).length;
   const safeCount = decisions.filter((d) => d.decision === 'SAFE').length;
 
   const recentDecisions = useMemo(() => decisions.slice(0, 6), [decisions]);
@@ -27,11 +29,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard label="Active vehicles" value={vehicleCount} tone="blue" />
         <StatCard label="Packets seen" value={packets.length} sub="last 200 buffered" />
         <StatCard label="SAFE decisions" value={safeCount} tone="teal" />
-        <StatCard label="WAIT decisions" value={waitCount} tone="amber" />
+        <StatCard label="CAUTION decisions" value={cautionCount} tone="amber" />
+        <StatCard label="WAIT decisions" value={waitCount} tone="red" />
       </div>
 
       <div className="grid grid-cols-3 gap-6">
@@ -51,7 +54,7 @@ export default function DashboardPage() {
             {recentDecisions.map((d) => (
               <div key={d.key} className="px-4 py-2.5 flex items-center justify-between text-sm">
                 <span className="font-mono text-ink">{d.vehicle_id}</span>
-                <span className={`font-mono text-xs ${d.decision === 'SAFE' ? 'text-teal' : 'text-amber'}`}>
+                <span className={`font-mono text-xs ${decisionColorClass(d.decision)}`}>
                   {d.decision}
                 </span>
               </div>

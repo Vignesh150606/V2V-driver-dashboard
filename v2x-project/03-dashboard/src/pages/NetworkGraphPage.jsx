@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useEventStore } from '../store/useEventStore.jsx';
+import { decisionColorHex } from '../lib/decisionTiers.js';
 
 const VB = 700;
 const CENTER = VB / 2;
@@ -72,7 +73,7 @@ export default function NetworkGraphPage() {
           {nodeIds.map((id) => {
             const p = positions[id];
             const decision = vehicles[id]?.lastDecision;
-            const color = decision === 'SAFE' ? '#29C7B3' : decision ? '#FFB020' : '#8FA3B8';
+            const color = decisionColorHex(decision);
             return (
               <g key={id}>
                 <circle cx={p.x} cy={p.y} r="16" fill="#121821" stroke={color} strokeWidth="2" />

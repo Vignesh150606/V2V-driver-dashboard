@@ -178,8 +178,11 @@ export default function ReplayPage() {
               <div className="text-xs text-ink3 mt-0.5">
                 {r.scenario} · {r.vehicle_count ?? '—'} vehicles · {r.event_count} events · {formatDuration(r.duration_sim)}
               </div>
-              {r.warning_count > 0 && (
-                <div className="text-xs text-amber mt-0.5">{r.warning_count} warning decisions</div>
+              {(r.critical_count > 0 || r.caution_count > 0) && (
+                <div className="text-xs mt-0.5 flex gap-3">
+                  {r.critical_count > 0 && <span className="text-red">{r.critical_count} critical</span>}
+                  {r.caution_count > 0 && <span className="text-amber">{r.caution_count} caution</span>}
+                </div>
               )}
             </div>
           ))}

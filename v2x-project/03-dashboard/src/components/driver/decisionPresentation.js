@@ -1,8 +1,8 @@
 // Maps a HazardApp decision label to what a driver should see. This is a
 // mapping over the decision VOCABULARY (a stable contract from HazardApp),
 // not over specific vehicles or scenarios -- a new scenario introducing a
-// new WAIT_* label still renders sensibly via the fallback, with zero
-// frontend changes required.
+// new WAIT_*/CAUTION_* label still renders sensibly via the fallback, with
+// zero frontend changes required.
 const KNOWN = {
   SAFE: {
     level: 'safe',
@@ -34,6 +34,33 @@ const KNOWN = {
     subtitle: 'Cross traffic detected, reduce speed',
     icon: 'intersection',
   },
+  // One tier below WAIT_* -- the situation is developing but not yet urgent.
+  // Own visual level ('watch') so it reads as genuinely different from both
+  // "all clear" and "act now", not a muted version of either.
+  CAUTION_BRAKE: {
+    level: 'watch',
+    title: 'Traffic Slowing Ahead',
+    subtitle: 'Stay alert, distance closing',
+    icon: 'stop',
+  },
+  CAUTION_TURNING: {
+    level: 'watch',
+    title: 'Vehicle Preparing to Turn',
+    subtitle: 'Stay alert, distance closing',
+    icon: 'turn',
+  },
+  CAUTION_TO_MERGE: {
+    level: 'watch',
+    title: 'Vehicle Merging Nearby',
+    subtitle: 'Stay alert, distance closing',
+    icon: 'merge',
+  },
+  CAUTION_INTERSECTION: {
+    level: 'watch',
+    title: 'Approaching Intersection',
+    subtitle: 'Stay alert, cross traffic nearby',
+    icon: 'intersection',
+  },
 };
 
 const LEVEL_STYLES = {
@@ -42,6 +69,12 @@ const LEVEL_STYLES = {
     border: 'border-emerald-400/40',
     text: 'text-emerald-300',
     glow: 'shadow-[0_0_60px_-10px_rgba(52,211,153,0.4)]',
+  },
+  watch: {
+    bg: 'from-sky-500/20 to-sky-500/5',
+    border: 'border-sky-400/40',
+    text: 'text-sky-300',
+    glow: 'shadow-[0_0_60px_-10px_rgba(56,189,248,0.4)]',
   },
   caution: {
     bg: 'from-amber-500/20 to-amber-500/5',
@@ -73,6 +106,14 @@ export function describeDecision(label) {
       level: 'caution',
       title: 'Hazard Detected',
       subtitle: 'Reduce speed and proceed with caution',
+      icon: 'warning',
+    };
+  }
+  if (label.startsWith('CAUTION')) {
+    return {
+      level: 'watch',
+      title: 'Situation Developing',
+      subtitle: 'Stay alert',
       icon: 'warning',
     };
   }

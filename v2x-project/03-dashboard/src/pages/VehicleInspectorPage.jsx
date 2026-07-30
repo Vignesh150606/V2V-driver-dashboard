@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useEventStore } from '../store/useEventStore.jsx';
+import { decisionColorClass } from '../lib/decisionTiers.js';
 
 export default function VehicleInspectorPage() {
   const { vehicles, decisions } = useEventStore();
@@ -44,7 +45,7 @@ export default function VehicleInspectorPage() {
                   ['x', selected.x?.toFixed(1)],
                   ['y', selected.y?.toFixed(1)],
                   ['speed (m/s)', selected.speed?.toFixed(1)],
-                  ['heading', `${selected.heading?.toFixed(0)}°`],
+                  ['heading', selected.heading != null ? `${selected.heading.toFixed(0)}°` : null],
                 ].map(([label, value]) => (
                   <div key={label} className="border border-line bg-panel rounded-lg px-3 py-2.5">
                     <div className="text-ink3 text-xs">{label}</div>
@@ -59,11 +60,14 @@ export default function VehicleInspectorPage() {
               <div className="border border-line bg-panel rounded-lg divide-y divide-line max-h-96 overflow-y-auto">
                 {history.length === 0 && <div className="px-4 py-6 text-sm text-ink3 text-center">no decisions logged for this vehicle yet</div>}
                 {history.map((d) => (
-                  <div key={d.key} className="px-4 py-2.5 flex items-center justify-between text-sm font-mono">
-                    <span className={d.decision === 'SAFE' ? 'text-teal' : 'text-amber'}>{d.decision}</span>
-                    <span className="text-ink2">ttc {d.ttc?.toFixed(2)}s</span>
-                    <span className="text-ink2">{d.distance_m?.toFixed(1)} m</span>
-                    <span className="text-ink3">t={d.timestamp_sim?.toFixed(2)}</span>
+                  <div key={d.key} className="px-4 py-2.5 text-sm font-mono">
+                    <div className="flex items-center justify-between">
+                      <span className={decisionColorClass(d.decision)}>{d.decision}</span>
+                      <span className="text-ink2">ttc {d.ttc?.toFixed(2)}s</span>
+                      <span className="text-ink2">{d.distance_m?.toFixed(1)} m</span>
+                      <span className="text-ink3">t={d.timestamp_sim?.toFixed(2)}</span>
+                    </div>
+                    {d.message && <div className="mt-1 text-xs text-ink3 truncate">{d.message}</div>}
                   </div>
                 ))}
               </div>

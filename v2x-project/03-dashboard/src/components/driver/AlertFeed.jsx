@@ -32,13 +32,27 @@ function AlertFeed({ incomingForVehicle }) {
   return (
     <div className="w-full max-w-2xl">
       {toast && (
-        <div className="driver-toast mb-3 rounded-xl border border-blue-400/40 bg-blue-500/15 backdrop-blur-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-blue-300 shrink-0">
-            <DecisionIcon name="signal" className="w-6 h-6" />
-          </span>
-          <div>
-            <div className="text-white font-medium">{describeMessage(toast.msg_type)}</div>
-            <div className="text-xs text-white/50 font-mono">from {toast.sender_id}</div>
+        // Fixed overlay, not normal flow: a toast that pushes content
+        // around when it appears/disappears shifts the height of this
+        // whole vertically-centered column every time a message arrives,
+        // which re-centers everything below it -- with enough content that
+        // can visibly push the warning card up under the top bar, and with
+        // messages arriving continuously it reads as constant jitter.
+        // Split into two divs on purpose: the outer one owns the static
+        // fixed-position centering (left-1/2 + -translate-x-1/2), the inner
+        // one owns the CSS keyframe animation (translateY + opacity only)
+        // -- combining both transforms on one element means the keyframe's
+        // `transform` would overwrite the centering the instant the 0.3s
+        // entrance animation ends, snapping the toast sideways.
+        <div className="fixed left-1/2 top-24 z-50 -translate-x-1/2 pointer-events-none px-6">
+          <div className="driver-toast w-[min(90vw,28rem)] rounded-xl border border-blue-400/40 bg-blue-500/15 backdrop-blur-xl px-4 py-3 flex items-center gap-3 shadow-lg shadow-black/40">
+            <span className="text-blue-300 shrink-0">
+              <DecisionIcon name="signal" className="w-6 h-6" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-white font-medium truncate">{describeMessage(toast.msg_type)}</div>
+              <div className="text-xs text-white/50 font-mono truncate">from {toast.sender_id}</div>
+            </div>
           </div>
         </div>
       )}

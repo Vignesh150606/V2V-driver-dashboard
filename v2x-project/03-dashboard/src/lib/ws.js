@@ -8,6 +8,7 @@ const DEFAULT_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
 export function connectEventStream({ onEvent, onStatusChange }) {
   let socket = null;
   let reconnectDelay = 1000;
+  let reconnectTimer = null;
   let closedByCaller = false;
 
   function connect() {
@@ -31,7 +32,7 @@ export function connectEventStream({ onEvent, onStatusChange }) {
     socket.onclose = () => {
       onStatusChange?.('disconnected');
       if (closedByCaller) return;
-      setTimeout(connect, reconnectDelay);
+      reconnectTimer = setTimeout(connect, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
     };
 
@@ -45,6 +46,7 @@ export function connectEventStream({ onEvent, onStatusChange }) {
   return {
     close() {
       closedByCaller = true;
+      clearTimeout(reconnectTimer); // otherwise a reconnect already queued from a prior disconnect fires anyway and opens a new socket after the caller thinks this is shut down
       socket?.close();
     },
   };

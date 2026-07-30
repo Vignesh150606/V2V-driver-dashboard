@@ -1,19 +1,11 @@
 import { useMemo } from 'react';
+import { decisionColorHex } from '../lib/decisionTiers.js';
 
 const VB_W = 800;
 const VB_H = 460;
 const PAD = 50;
 const PULSE_WINDOW_MS = 1100;
 const PATH_WINDOW_MS = 1400;
-
-const DECISION_COLOR = {
-  SAFE: '#29C7B3',
-};
-function colorForDecision(decision) {
-  if (!decision) return '#5A6B7D';
-  if (DECISION_COLOR[decision]) return DECISION_COLOR[decision];
-  return '#FFB020'; // any WAIT_* label
-}
 
 export default function VehicleMap({ vehicles, packets, now }) {
   const list = useMemo(() => Object.values(vehicles), [vehicles]);
@@ -78,7 +70,7 @@ export default function VehicleMap({ vehicles, packets, now }) {
         {/* vehicles, colored by their last real decision from HazardApp */}
         {list.map((v) => {
           const { px, py } = project(v.x, v.y);
-          const color = colorForDecision(v.lastDecision);
+          const color = decisionColorHex(v.lastDecision);
           return (
             <g key={v.id}>
               <circle cx={px} cy={py} r="7" fill={color} stroke="#0B0F14" strokeWidth="2" />

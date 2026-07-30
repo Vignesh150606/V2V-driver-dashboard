@@ -8,7 +8,8 @@ const MAX_SHOWN = 8; // nearest N -- keeps it glanceable and cheap to render eve
 function statusColor(decision) {
   if (!decision) return '#8FA3B8';
   if (decision === 'SAFE') return '#29C7B3';
-  return '#FFB020';
+  if (decision.startsWith('CAUTION')) return '#FFB020';
+  return '#FF5A5F'; // WAIT_* -- the same "act now" tier as everywhere else in the app
 }
 
 function MiniRadar({ vehicles, selfId }) {

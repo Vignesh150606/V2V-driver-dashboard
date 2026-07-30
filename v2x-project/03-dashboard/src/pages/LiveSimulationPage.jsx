@@ -20,7 +20,10 @@ export default function LiveSimulationPage() {
           <span className="h-2 w-2 rounded-full bg-teal" /> SAFE
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-amber" /> WAIT_*
+          <span className="h-2 w-2 rounded-full bg-amber" /> CAUTION_*
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-red" /> WAIT_*
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-ink3" /> no decision yet

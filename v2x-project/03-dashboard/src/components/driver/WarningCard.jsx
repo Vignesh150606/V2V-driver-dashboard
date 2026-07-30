@@ -2,9 +2,14 @@ import { memo } from 'react';
 import { describeDecision, levelStyles } from './decisionPresentation.js';
 import DecisionIcon from './icons.jsx';
 
-function WarningCard({ decisionLabel }) {
+function WarningCard({ decisionLabel, message }) {
   const info = describeDecision(decisionLabel);
   const styles = levelStyles(info.level);
+  // Prefer the backend's scenario-aware sentence ("Vehicle approaching from
+  // left — yield") over the static per-label subtitle -- it's the whole
+  // point of the dynamic messaging system. Falls back cleanly for replayed
+  // runs recorded before this field existed.
+  const supportingText = message || info.subtitle;
 
   return (
     <div
@@ -17,8 +22,8 @@ function WarningCard({ decisionLabel }) {
       <div className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
         {info.title}
       </div>
-      {info.subtitle && (
-        <div className="mt-3 text-lg md:text-xl text-white/70">{info.subtitle}</div>
+      {supportingText && (
+        <div className="mt-3 text-lg md:text-xl text-white/70 break-words">{supportingText}</div>
       )}
     </div>
   );

@@ -73,10 +73,15 @@ export default function DriverView() {
       {/* Main HMI */}
       <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6 py-6 overflow-y-auto">
         {!selectedId ? (
-          <div className="text-white/40 text-lg">Waiting for a vehicle to appear in the simulation…</div>
+          <div className="flex flex-col items-center gap-3 text-white/40 text-lg">
+            {!connected && (
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse" aria-hidden="true" />
+            )}
+            <span>{connected ? 'Waiting for a vehicle to appear in the simulation…' : 'Connecting to simulation bridge…'}</span>
+          </div>
         ) : (
           <>
-            <WarningCard decisionLabel={latestDecision?.decision} />
+            <WarningCard decisionLabel={latestDecision?.decision} message={latestDecision?.message} />
             <DecisionCard
               decision={latestDecision}
               currentSpeed={vehicleState?.speed}

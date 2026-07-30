@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { useEventStore } from '../store/useEventStore.jsx';
 import StatCard from '../components/StatCard.jsx';
+import { decisionColorHex } from '../lib/decisionTiers.js';
 
 export default function AnalyticsPage() {
   const { decisions } = useEventStore();
@@ -23,8 +24,8 @@ export default function AnalyticsPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="text-xs text-ink2 uppercase tracking-wide">
-        Live session analytics — {decisions.length} decisions observed. For the full 431-row batch
-        corpus, aggregate your existing CSV output the same way you do today.
+        Live session analytics — {decisions.length} decisions observed. For the full batch corpus,
+        aggregate your existing CSV output the same way you do today.
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -40,13 +41,26 @@ export default function AnalyticsPage() {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byLabel}>
               <CartesianGrid stroke="#223041" vertical={false} />
-              <XAxis dataKey="label" stroke="#8FA3B8" fontSize={12} fontFamily="monospace" />
+              <XAxis
+                dataKey="label"
+                stroke="#8FA3B8"
+                fontSize={11}
+                fontFamily="monospace"
+                angle={-25}
+                textAnchor="end"
+                height={60}
+                interval={0}
+              />
               <YAxis stroke="#8FA3B8" fontSize={12} allowDecimals={false} />
               <Tooltip
                 contentStyle={{ background: '#121821', border: '1px solid #223041', fontSize: 12 }}
                 labelStyle={{ color: '#E7EDF3' }}
               />
-              <Bar dataKey="count" fill="#29C7B3" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {byLabel.map((entry) => (
+                  <Cell key={entry.label} fill={decisionColorHex(entry.label)} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
